@@ -129,6 +129,8 @@ print("Hello, Pyodide!")</textarea>
     <!-- Добавление автодополнения CodeMirror -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/anyword-hint.min.js"></script>
+    <!-- Добавление автозакрытия кавычек и скобок -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
     <!-- html2canvas для скриншотов -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
@@ -155,7 +157,7 @@ print("Hello, Pyodide!")</textarea>
             "set"
         ];
 
-        // Инициализация CodeMirror с автодополнением
+        // Инициализация CodeMirror с автодополнением и автозакрытием скобок
         const textarea = document.getElementById('editor');
         const editor = CodeMirror.fromTextArea(textarea, {
             lineNumbers: true,
@@ -165,6 +167,7 @@ print("Hello, Pyodide!")</textarea>
             indentUnit: 4,
             tabSize: 4,
             lineWrapping: true,
+            autoCloseBrackets: true, // Включение автозакрытия скобок и кавычек
             extraKeys: {
                 "F11": function(cm) { toggleFullScreen(); },
                 "Esc": function(cm) { if (isFullScreen()) toggleFullScreen(); }
