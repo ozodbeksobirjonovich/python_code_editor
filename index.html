@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Редактор Python с Pyodide</title>
+    <title>Полноэкранный Редактор Python с Pyodide</title>
     <!-- Подключение Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Подключение CodeMirror CSS -->
@@ -14,49 +14,38 @@
     <!-- Подключение Droid Sans Mono шрифта -->
     <link href="https://fonts.googleapis.com/css2?family=Droid+Sans+Mono&display=swap" rel="stylesheet">
     <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Droid Sans Mono', monospace;
+            transition: background-color 0.3s, color 0.3s;
+        }
         body.dark {
             background-color: #202124;
             color: #e8eaed;
-            font-family: 'Droid Sans Mono', monospace;
-            transition: background-color 0.3s, color 0.3s;
         }
         body.light {
             background-color: #ffffff;
             color: #202124;
-            font-family: 'Droid Sans Mono', monospace;
-            transition: background-color 0.3s, color 0.3s;
         }
-        /* Центрирование контейнера редактора */
+        /* Полноэкранный контейнер редактора */
         .editor-container {
-            max-width: 800px;
-            margin: 100px auto 20px auto;
-            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 10px;
             background-color: #303134;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            transition: background-color 0.3s, box-shadow 0.3s;
+            transition: background-color 0.3s;
         }
         body.light .editor-container {
             background-color: #f1f3f4;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
-        /* Настройки для CodeMirror */
-        .CodeMirror {
-            height: 400px;
-            border: 1px solid #5f6368;
-            border-radius: 8px;
-            font-family: 'Droid Sans Mono', monospace;
-            font-size: 16px;
-        }
-        body.light .CodeMirror {
-            border: 1px solid #ced4da;
-        }
-        /* Стиль кнопок */
+        /* Навигационная панель (Toolbar) */
         .toolbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             flex-wrap: wrap;
         }
         .toolbar .btn-group {
@@ -65,12 +54,24 @@
             flex-wrap: wrap;
         }
         .toolbar .btn {
-            border-radius: 4px !important; /* Сделать края более прямыми */
+            border-radius: 4px !important;
             padding: 8px 16px;
             transition: background-color 0.3s, border-color 0.3s;
         }
         .toolbar .btn:hover {
             opacity: 0.9;
+        }
+        /* Настройки для CodeMirror */
+        .CodeMirror {
+            flex: 1;
+            border: 1px solid #5f6368;
+            border-radius: 8px;
+            font-family: 'Droid Sans Mono', monospace;
+            font-size: 16px;
+            height: auto;
+        }
+        body.light .CodeMirror {
+            border: 1px solid #ced4da;
         }
         /* Стиль модального окна для вывода результата */
         .modal-content {
@@ -103,9 +104,6 @@
             }
             .toolbar .btn-group {
                 justify-content: center;
-            }
-            .CodeMirror {
-                height: 300px;
             }
         }
     </style>
@@ -196,7 +194,9 @@ print("Hello, Pyodide!")</textarea>
             tabSize: 4,
             lineWrapping: true,
             extraKeys: {
-                "Ctrl-Space": "autocomplete"
+                "Ctrl-Space": "autocomplete",
+                "F11": function(cm) { toggleFullScreen(); },
+                "Esc": function(cm) { if (isFullScreen()) toggleFullScreen(); }
             },
             hintOptions: {
                 hint: function(cm) {
@@ -217,6 +217,21 @@ print("Hello, Pyodide!")</textarea>
                 completeSingle: false
             }
         });
+
+        // Функции для полноэкранного режима
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function isFullScreen() {
+            return !!document.fullscreenElement;
+        }
 
         // Загрузка Pyodide
         let pyodideReady = false;
@@ -380,6 +395,11 @@ except Exception as e:
             const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl)
             })
+        });
+
+        // Обработка изменения размера окна для корректного отображения редактора
+        window.addEventListener('resize', () => {
+            editor.refresh();
         });
     </script>
 </body>
