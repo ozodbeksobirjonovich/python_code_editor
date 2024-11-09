@@ -73,38 +73,9 @@
         body.light .CodeMirror {
             border: 1px solid #ced4da;
         }
-        /* Стиль модального окна для вывода результата */
-        .modal-content {
-            background-color: inherit;
-            color: inherit;
-            font-family: 'Droid Sans Mono', monospace;
-        }
-        body.light .modal-content {
-            background-color: #ffffff;
-            color: #202124;
-        }
-        body.dark .modal-content {
-            background-color: #303134;
-            color: #e8eaed;
-        }
-        .modal-body {
-            background-color: inherit;
-            color: inherit;
-        }
-        .modal-body pre {
-            background-color: inherit;
-            color: inherit;
-            border: none;
-        }
-        /* Адаптивность для мобильных устройств */
-        @media (max-width: 576px) {
-            .toolbar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .toolbar .btn-group {
-                justify-content: center;
-            }
+        /* Обеспечение адаптивности CodeMirror */
+        .CodeMirror-scroll {
+            max-height: 100%;
         }
     </style>
 </head>
@@ -117,6 +88,7 @@
                 <button id="run-btn" class="btn btn-primary">Выполнить</button>
                 <button id="screenshot-btn" class="btn btn-secondary">Скриншот</button>
                 <button id="share-btn" class="btn btn-success">Поделиться</button>
+                <button id="download-btn" class="btn btn-warning">Скачать</button>
                 <button id="load-btn" class="btn btn-info">Загрузить</button>
                 <input type="file" id="file-input" accept=".py" style="display:none;">
             </div>
@@ -128,7 +100,7 @@
 print("Hello, Pyodide!")</textarea>
     </div>
 
-    <!-- Модальное окно для вывода результата -->
+    <!-- Стандартное Bootstrap-модальное окно для вывода результата -->
     <div class="modal fade" id="outputModal" tabindex="-1" aria-labelledby="outputModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -194,7 +166,6 @@ print("Hello, Pyodide!")</textarea>
             tabSize: 4,
             lineWrapping: true,
             extraKeys: {
-                "Ctrl-Space": "autocomplete",
                 "F11": function(cm) { toggleFullScreen(); },
                 "Esc": function(cm) { if (isFullScreen()) toggleFullScreen(); }
             },
@@ -215,6 +186,32 @@ print("Hello, Pyodide!")</textarea>
                     };
                 },
                 completeSingle: false
+            }
+        });
+
+        // Автоматическое автодополнение при вводе
+        editor.on("inputRead", function(cm, change) {
+            if (!cm.state.completionActive) {
+                cm.showHint({
+                    hint: function(cm) {
+                        const cur = cm.getCursor();
+                        const token = cm.getTokenAt(cur);
+                        const start = token.start;
+                        const end = cur.ch;
+                        const currentWord = token.string.slice(0, cur.ch - token.start);
+                        const list = pythonKeywords.concat(pythonBuiltins).filter(function(item) {
+                            return item.startsWith(currentWord);
+                        });
+                        return {
+                            list: list,
+                            from: CodeMirror.Pos(cur.line, start),
+                            to: CodeMirror.Pos(cur.line, end)
+                        };
+                    },
+                    completeSingle: false,
+                    alignWithWord: true,
+                    closeOnUnfocus: false
+                });
             }
         });
 
@@ -257,9 +254,6 @@ print("Hello, Pyodide!")</textarea>
                 themeToggleBtn.textContent = 'Светлый режим';
                 themeToggleBtn.classList.remove('btn-outline-dark');
                 themeToggleBtn.classList.add('btn-outline-light');
-                // Изменение стиля модального окна
-                document.querySelector('#outputModal .modal-content').classList.remove('light');
-                document.querySelector('#outputModal .modal-content').classList.add('dark');
                 // Изменение стиля вывода
                 outputPre.classList.remove('bg-light', 'text-dark');
                 outputPre.classList.add('bg-dark', 'text-light');
@@ -270,9 +264,6 @@ print("Hello, Pyodide!")</textarea>
                 themeToggleBtn.textContent = 'Темный режим';
                 themeToggleBtn.classList.remove('btn-outline-light');
                 themeToggleBtn.classList.add('btn-outline-dark');
-                // Изменение стиля модального окна
-                document.querySelector('#outputModal .modal-content').classList.remove('dark');
-                document.querySelector('#outputModal .modal-content').classList.add('light');
                 // Изменение стиля вывода
                 outputPre.classList.remove('bg-dark', 'text-light');
                 outputPre.classList.add('bg-light', 'text-dark');
@@ -387,6 +378,21 @@ except Exception as e:
             } else {
                 alert("Пожалуйста, выберите файл с расширением .py");
             }
+        });
+
+        // Кнопка Скачать
+        const downloadBtn = document.getElementById('download-btn');
+        downloadBtn.addEventListener('click', () => {
+            const code = editor.getValue();
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'code.py';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         });
 
         // Инициализация Bootstrap Tooltip (для кнопки Поделиться)
