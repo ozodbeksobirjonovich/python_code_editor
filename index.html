@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Полноэкранный Редактор Python с Pyodide</title>
-    <!-- Подключение Tailwind CSS через CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Подключение CodeMirror CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
@@ -20,13 +20,11 @@
             font-family: 'Droid Sans Mono', monospace;
             transition: background-color 0.3s, color 0.3s;
         }
-        /* Темная тема */
-        .dark {
+        body.dark {
             background-color: #202124;
             color: #e8eaed;
         }
-        /* Светлая тема */
-        .light {
+        body.light {
             background-color: #ffffff;
             color: #202124;
         }
@@ -39,8 +37,29 @@
             background-color: #303134;
             transition: background-color 0.3s;
         }
-        .light .editor-container {
+        body.light .editor-container {
             background-color: #f1f3f4;
+        }
+        /* Навигационная панель (Toolbar) */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .toolbar .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .toolbar .btn {
+            border-radius: 4px !important;
+            padding: 8px 16px;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .toolbar .btn:hover {
+            opacity: 0.9;
         }
         /* Настройки для CodeMirror */
         .CodeMirror {
@@ -51,50 +70,65 @@
             font-size: 16px;
             height: auto;
         }
-        .light .CodeMirror {
+        body.light .CodeMirror {
             border: 1px solid #ced4da;
         }
         /* Обеспечение адаптивности CodeMirror */
         .CodeMirror-scroll {
             max-height: 100%;
         }
-        /* Стили для модального окна */
-        .modal {
-            display: none; /* Скрыто по умолчанию */
-            position: fixed;
-            z-index: 50;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-            transition: opacity 0.3s;
+
+        /* Темные стили для модального окна */
+        body.dark .modal-content {
+            background-color: #343a40; /* Темный фон */
+            color: #e8eaed; /* Светлый текст */
         }
-        .modal.active {
-            display: block;
+
+        body.dark .modal-header,
+        body.dark .modal-footer {
+            border-color: #454d55; /* Темные границы */
         }
-        .modal-content {
-            background-color: inherit;
-            margin: 10% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 800px;
-            border-radius: 8px;
+
+        body.dark .modal-header .modal-title {
+            color: #e8eaed; /* Светлый заголовок */
         }
-        /* Стили для окна результатов */
-        .output {
-            background-color: #202124; /* Тёмная тема по умолчанию */
-            color: #e8eaed;
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-            white-space: pre-wrap;
+
+        body.dark .btn-close {
+            filter: invert(1); /* Инверсия цвета кнопки закрытия для видимости */
         }
-        .light .output {
-            background-color: #f1f3f4;
-            color: #202124;
+
+        body.dark #output {
+            background-color: #2c2f33; /* Темный фон для вывода */
+            color: #e8eaed; /* Светлый текст для вывода */
+        }
+
+        /* Светлые стили для модального окна */
+        body.light .modal-content {
+            background-color: #ffffff; /* Светлый фон */
+            color: #202124; /* Темный текст */
+        }
+
+        body.light .modal-header,
+        body.light .modal-footer {
+            border-color: #dee2e6; /* Светлые границы */
+        }
+
+        body.light .modal-header .modal-title {
+            color: #202124; /* Темный заголовок */
+        }
+
+        body.light .btn-close {
+            /* Кнопка закрытия по умолчанию хорошо видна на светлом фоне */
+        }
+
+        body.light #output {
+            background-color: #f8f9fa; /* Светлый фон для вывода */
+            color: #202124; /* Темный текст для вывода */
+        }
+
+        /* Плавные переходы для модального окна и вывода */
+        .modal-content, #output {
+            transition: background-color 0.3s, color 0.3s;
         }
     </style>
 </head>
@@ -102,16 +136,16 @@
     <!-- Контейнер редактора -->
     <div class="editor-container">
         <!-- Навигационная панель (Toolbar) -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-4">
-            <div class="flex flex-wrap gap-2 mb-2 md:mb-0">
-                <button id="run-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded">Выполнить</button>
-                <button id="screenshot-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded">Скриншот</button>
-                <button id="share-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded">Поделиться</button>
-                <button id="download-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded">Скачать</button>
-                <button id="load-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded">Загрузить</button>
+        <div class="toolbar">
+            <div class="btn-group mb-2">
+                <button id="run-btn" class="btn btn-primary">Выполнить</button>
+                <button id="screenshot-btn" class="btn btn-secondary">Скриншот</button>
+                <button id="share-btn" class="btn btn-success">Поделиться</button>
+                <button id="download-btn" class="btn btn-warning">Скачать</button>
+                <button id="load-btn" class="btn btn-info">Загрузить</button>
                 <input type="file" id="file-input" accept=".py" style="display:none;">
             </div>
-            <button id="theme-toggle" class="border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-2 px-4 rounded">Светлый режим</button>
+            <button id="theme-toggle" class="btn btn-outline-light">Светлый режим</button>
         </div>
 
         <!-- Редактор кода -->
@@ -119,21 +153,27 @@
 print("Hello, Pyodide!")</textarea>
     </div>
 
-    <!-- Модальное окно для вывода результата -->
-    <div id="outputModal" class="modal">
-        <div class="modal-content bg-white dark:bg-gray-800 rounded shadow-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200">Результат</h2>
-                <button id="closeModal" class="text-gray-800 dark:text-gray-200">&times;</button>
-            </div>
-            <pre id="output" class="output"></pre>
-            <div class="flex justify-end mt-4">
-                <button id="closeModalBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded">Закрыть</button>
+    <!-- Стандартное Bootstrap-модальное окно для вывода результата -->
+    <div class="modal fade" id="outputModal" tabindex="-1" aria-labelledby="outputModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" id="modalContent">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="outputModalLabel">Результат</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="output" class="p-3 rounded"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Подключение необходимых скриптов -->
+    <!-- Bootstrap JS и зависимости -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Pyodide -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.js"></script>
     <!-- CodeMirror JS -->
@@ -264,34 +304,47 @@ print("Hello, Pyodide!")</textarea>
         themeToggleBtn.addEventListener('click', () => {
             darkMode = !darkMode;
             if (darkMode) {
-                document.documentElement.classList.remove('light');
-                document.documentElement.classList.add('dark');
+                document.body.classList.remove('light');
+                document.body.classList.add('dark');
                 editor.setOption('theme', 'dracula');
                 themeToggleBtn.textContent = 'Светлый режим';
-                themeToggleBtn.classList.remove('border-gray-300', 'text-gray-700', 'dark:border-gray-700', 'dark:text-gray-300');
-                themeToggleBtn.classList.add('border-gray-700', 'text-gray-300', 'dark:border-gray-300', 'dark:text-gray-700');
-                // Изменение стиля вывода
-                outputPre.classList.remove('bg-light', 'text-dark');
-                outputPre.classList.add('bg-dark', 'text-light');
+                themeToggleBtn.classList.remove('btn-outline-dark');
+                themeToggleBtn.classList.add('btn-outline-light');
             } else {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.classList.add('light');
+                document.body.classList.remove('dark');
+                document.body.classList.add('light');
                 editor.setOption('theme', 'default');
                 themeToggleBtn.textContent = 'Темный режим';
-                themeToggleBtn.classList.remove('border-gray-700', 'text-gray-300', 'dark:border-gray-300', 'dark:text-gray-700');
-                themeToggleBtn.classList.add('border-gray-300', 'text-gray-700', 'dark:border-gray-700', 'dark:text-gray-300');
-                // Изменение стиля вывода
-                outputPre.classList.remove('bg-dark', 'text-light');
-                outputPre.classList.add('bg-light', 'text-dark');
+                themeToggleBtn.classList.remove('btn-outline-light');
+                themeToggleBtn.classList.add('btn-outline-dark');
             }
+            // Обновление стиля модального окна
+            updateModalTheme();
         });
+
+        // Reference to modal content and output pre
+        const modalContent = document.getElementById('modalContent');
+        const outputPre = document.getElementById('output');
+
+        // Function to update modal styles based on theme
+        function updateModalTheme() {
+            if (darkMode) {
+                // Добавляем классы Bootstrap для темного режима
+                modalContent.classList.remove('bg-light', 'text-dark');
+                modalContent.classList.add('bg-dark', 'text-light');
+            } else {
+                // Добавляем классы Bootstrap для светлого режима
+                modalContent.classList.remove('bg-dark', 'text-light');
+                modalContent.classList.add('bg-light', 'text-dark');
+            }
+        }
+
+        // Инициализация модального окна с текущей темой
+        updateModalTheme();
 
         // Выполнение кода
         const runBtn = document.getElementById('run-btn');
-        const outputPre = document.getElementById('output');
-        const outputModal = document.getElementById('outputModal');
-        const closeModal = document.getElementById('closeModal');
-        const closeModalBtn = document.getElementById('closeModalBtn');
+        const outputModal = new bootstrap.Modal(document.getElementById('outputModal'));
 
         runBtn.addEventListener('click', async () => {
             if (!pyodideReady) {
@@ -322,19 +375,25 @@ except Exception as e:
                     result += '\n' + stderr;
                 }
                 outputPre.textContent = result;
+                // Адаптация цвета фона pre в зависимости от темы
+                if (darkMode) {
+                    outputPre.classList.remove('bg-light', 'text-dark');
+                    outputPre.classList.add('bg-dark', 'text-light');
+                } else {
+                    outputPre.classList.remove('bg-dark', 'text-light');
+                    outputPre.classList.add('bg-light', 'text-dark');
+                }
             } catch (err) {
                 outputPre.textContent = err;
+                if (darkMode) {
+                    outputPre.classList.remove('bg-light', 'text-dark');
+                    outputPre.classList.add('bg-dark', 'text-light');
+                } else {
+                    outputPre.classList.remove('bg-dark', 'text-light');
+                    outputPre.classList.add('bg-light', 'text-dark');
+                }
             }
-            outputModal.classList.add('active');
-        });
-
-        // Закрытие модального окна
-        closeModal.addEventListener('click', () => {
-            outputModal.classList.remove('active');
-        });
-
-        closeModalBtn.addEventListener('click', () => {
-            outputModal.classList.remove('active');
+            outputModal.show();
         });
 
         // Скриншот
@@ -356,13 +415,15 @@ except Exception as e:
             const blob = new Blob([code], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             navigator.clipboard.writeText(url).then(() => {
-                // Создание всплывающего сообщения
-                const tooltip = document.createElement('div');
-                tooltip.className = 'fixed bottom-5 right-5 bg-green-500 text-white px-4 py-2 rounded shadow-lg';
-                tooltip.textContent = "Ссылка на код скопирована!";
-                document.body.appendChild(tooltip);
+                const tooltip = new bootstrap.Tooltip(shareBtn, {
+                    title: "Ссылка на код скопирована!",
+                    placement: "bottom",
+                    trigger: "manual"
+                });
+                tooltip.show();
                 setTimeout(() => {
-                    tooltip.remove();
+                    tooltip.hide();
+                    tooltip.dispose();
                 }, 2000);
             }).catch(err => {
                 alert("Не удалось скопировать ссылку.");
@@ -403,6 +464,14 @@ except Exception as e:
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+        });
+
+        // Инициализация Bootstrap Tooltip (для кнопки Поделиться)
+        document.addEventListener('DOMContentLoaded', () => {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
         });
 
         // Обработка изменения размера окна для корректного отображения редактора
