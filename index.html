@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор Python с Pyodide</title>
+    <!-- Подключение Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Подключение CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <!-- Подключение CSS для автодополнения -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css">
+    <!-- Подключение Droid Sans Mono шрифта -->
+    <link href="https://fonts.googleapis.com/css2?family=Droid+Sans+Mono&display=swap" rel="stylesheet">
+    <style>
+        body.dark {
+            background-color: #202124;
+            color: #e8eaed;
+            font-family: 'Droid Sans Mono', monospace;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.light {
+            background-color: #ffffff;
+            color: #202124;
+            font-family: 'Droid Sans Mono', monospace;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        /* Центрирование контейнера редактора */
+        .editor-container {
+            max-width: 800px;
+            margin: 100px auto 20px auto;
+            padding: 20px;
+            background-color: #303134;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        body.light .editor-container {
+            background-color: #f1f3f4;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        /* Настройки для CodeMirror */
+        .CodeMirror {
+            height: 400px;
+            border: 1px solid #5f6368;
+            border-radius: 8px;
+            font-family: 'Droid Sans Mono', monospace;
+            font-size: 16px;
+        }
+        body.light .CodeMirror {
+            border: 1px solid #ced4da;
+        }
+        /* Стиль кнопок */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .toolbar .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .toolbar .btn {
+            border-radius: 4px !important; /* Сделать края более прямыми */
+            padding: 8px 16px;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .toolbar .btn:hover {
+            opacity: 0.9;
+        }
+        /* Стиль модального окна для вывода результата */
+        .modal-content {
+            background-color: inherit;
+            color: inherit;
+            font-family: 'Droid Sans Mono', monospace;
+        }
+        body.light .modal-content {
+            background-color: #ffffff;
+            color: #202124;
+        }
+        body.dark .modal-content {
+            background-color: #303134;
+            color: #e8eaed;
+        }
+        .modal-body {
+            background-color: inherit;
+            color: inherit;
+        }
+        .modal-body pre {
+            background-color: inherit;
+            color: inherit;
+            border: none;
+        }
+        /* Адаптивность для мобильных устройств */
+        @media (max-width: 576px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .toolbar .btn-group {
+                justify-content: center;
+            }
+            .CodeMirror {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body class="dark">
+    <!-- Контейнер редактора -->
+    <div class="editor-container">
+        <!-- Навигационная панель (Toolbar) -->
+        <div class="toolbar">
+            <div class="btn-group mb-2">
+                <button id="run-btn" class="btn btn-primary">Выполнить</button>
+                <button id="screenshot-btn" class="btn btn-secondary">Скриншот</button>
+                <button id="share-btn" class="btn btn-success">Поделиться</button>
+                <button id="load-btn" class="btn btn-info">Загрузить</button>
+                <input type="file" id="file-input" accept=".py" style="display:none;">
+            </div>
+            <button id="theme-toggle" class="btn btn-outline-light">Светлый режим</button>
+        </div>
+
+        <!-- Редактор кода -->
+        <textarea id="editor"># Напишите ваш код здесь
+print("Hello, Pyodide!")</textarea>
+    </div>
+
+    <!-- Модальное окно для вывода результата -->
+    <div class="modal fade" id="outputModal" tabindex="-1" aria-labelledby="outputModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="outputModalLabel">Результат</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="output" class="bg-dark text-light p-3 rounded"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение необходимых скриптов -->
+    <!-- Bootstrap JS и зависимости -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.js"></script>
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+    <!-- Добавление автодополнения CodeMirror -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/anyword-hint.min.js"></script>
+    <!-- html2canvas для скриншотов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        // Список Python-ключевых слов и встроенных функций для автодополнения
+        const pythonKeywords = [
+            "False", "None", "True", "and", "as", "assert", "async", "await",
+            "break", "class", "continue", "def", "del", "elif", "else", "except",
+            "finally", "for", "from", "global", "if", "import", "in", "is",
+            "lambda", "nonlocal", "not", "or", "pass", "raise", "return",
+            "try", "while", "with", "yield"
+        ];
+
+        const pythonBuiltins = [
+            "abs", "dict", "help", "min", "setattr", "all", "dir", "hex",
+            "next", "slice", "any", "divmod", "id", "object", "sorted",
+            "ascii", "enumerate", "input", "oct", "staticmethod", "bin",
+            "eval", "int", "open", "str", "bool", "exec", "isinstance",
+            "ord", "sum", "bytearray", "filter", "issubclass", "pow",
+            "super", "bytes", "float", "iter", "print", "tuple", "callable",
+            "format", "len", "property", "type", "chr", "frozenset", "list",
+            "range", "vars", "classmethod", "getattr", "locals", "repr",
+            "zip", "compile", "globals", "map", "reversed", "__import__",
+            "complex", "hasattr", "max", "round", "delattr", "hash", "memoryview",
+            "set"
+        ];
+
+        // Инициализация CodeMirror с автодополнением
+        const textarea = document.getElementById('editor');
+        const editor = CodeMirror.fromTextArea(textarea, {
+            lineNumbers: true,
+            mode: 'python',
+            theme: 'dracula', // Тёмная тема
+            autofocus: true,
+            indentUnit: 4,
+            tabSize: 4,
+            lineWrapping: true,
+            extraKeys: {
+                "Ctrl-Space": "autocomplete"
+            },
+            hintOptions: {
+                hint: function(cm) {
+                    const cur = cm.getCursor();
+                    const token = cm.getTokenAt(cur);
+                    const start = token.start;
+                    const end = cur.ch;
+                    const currentWord = token.string.slice(0, cur.ch - token.start);
+                    const list = pythonKeywords.concat(pythonBuiltins).filter(function(item) {
+                        return item.startsWith(currentWord);
+                    });
+                    return {
+                        list: list,
+                        from: CodeMirror.Pos(cur.line, start),
+                        to: CodeMirror.Pos(cur.line, end)
+                    };
+                },
+                completeSingle: false
+            }
+        });
+
+        // Загрузка Pyodide
+        let pyodideReady = false;
+        let pyodide = null;
+
+        async function loadPyodideAndPackages() {
+            pyodide = await loadPyodide();
+            pyodideReady = true;
+        }
+
+        loadPyodideAndPackages();
+
+        // Переключение темы
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        let darkMode = true; // Тёмная тема по умолчанию
+
+        themeToggleBtn.addEventListener('click', () => {
+            darkMode = !darkMode;
+            if (darkMode) {
+                document.body.classList.remove('light');
+                document.body.classList.add('dark');
+                editor.setOption('theme', 'dracula');
+                themeToggleBtn.textContent = 'Светлый режим';
+                themeToggleBtn.classList.remove('btn-outline-dark');
+                themeToggleBtn.classList.add('btn-outline-light');
+                // Изменение стиля модального окна
+                document.querySelector('#outputModal .modal-content').classList.remove('light');
+                document.querySelector('#outputModal .modal-content').classList.add('dark');
+                // Изменение стиля вывода
+                outputPre.classList.remove('bg-light', 'text-dark');
+                outputPre.classList.add('bg-dark', 'text-light');
+            } else {
+                document.body.classList.remove('dark');
+                document.body.classList.add('light');
+                editor.setOption('theme', 'default');
+                themeToggleBtn.textContent = 'Темный режим';
+                themeToggleBtn.classList.remove('btn-outline-light');
+                themeToggleBtn.classList.add('btn-outline-dark');
+                // Изменение стиля модального окна
+                document.querySelector('#outputModal .modal-content').classList.remove('dark');
+                document.querySelector('#outputModal .modal-content').classList.add('light');
+                // Изменение стиля вывода
+                outputPre.classList.remove('bg-dark', 'text-light');
+                outputPre.classList.add('bg-light', 'text-dark');
+            }
+        });
+
+        // Выполнение кода
+        const runBtn = document.getElementById('run-btn');
+        const outputPre = document.getElementById('output');
+        const outputModal = new bootstrap.Modal(document.getElementById('outputModal'));
+
+        runBtn.addEventListener('click', async () => {
+            if (!pyodideReady) {
+                alert("Pyodide ещё загружается...");
+                return;
+            }
+            const code = editor.getValue();
+            try {
+                // Экранирование обратных слэшей и кавычек
+                const escapedCode = code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+                pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+sys.stderr = StringIO()
+try:
+    exec("""${escapedCode}""")
+    output = sys.stdout.getvalue()
+    error = sys.stderr.getvalue()
+except Exception as e:
+    output = ""
+    error = str(e)
+                `);
+                const stdout = pyodide.globals.get('output');
+                const stderr = pyodide.globals.get('error');
+                let result = stdout;
+                if (stderr) {
+                    result += '\n' + stderr;
+                }
+                outputPre.textContent = result;
+                // Адаптация цвета фона pre в зависимости от темы
+                if (darkMode) {
+                    outputPre.classList.remove('bg-light', 'text-dark');
+                    outputPre.classList.add('bg-dark', 'text-light');
+                } else {
+                    outputPre.classList.remove('bg-dark', 'text-light');
+                    outputPre.classList.add('bg-light', 'text-dark');
+                }
+            } catch (err) {
+                outputPre.textContent = err;
+                if (darkMode) {
+                    outputPre.classList.remove('bg-light', 'text-dark');
+                    outputPre.classList.add('bg-dark', 'text-light');
+                } else {
+                    outputPre.classList.remove('bg-dark', 'text-light');
+                    outputPre.classList.add('bg-light', 'text-dark');
+                }
+            }
+            outputModal.show();
+        });
+
+        // Скриншот
+        const screenshotBtn = document.getElementById('screenshot-btn');
+        screenshotBtn.addEventListener('click', () => {
+            const editorContent = editor.getWrapperElement();
+            html2canvas(editorContent).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'screenshot.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        });
+
+        // Совместное использование кода
+        const shareBtn = document.getElementById('share-btn');
+        shareBtn.addEventListener('click', () => {
+            const code = editor.getValue();
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            navigator.clipboard.writeText(url).then(() => {
+                const tooltip = new bootstrap.Tooltip(shareBtn, {
+                    title: "Ссылка на код скопирована!",
+                    placement: "bottom",
+                    trigger: "manual"
+                });
+                tooltip.show();
+                setTimeout(() => {
+                    tooltip.hide();
+                    tooltip.dispose();
+                }, 2000);
+            }).catch(err => {
+                alert("Не удалось скопировать ссылку.");
+            });
+        });
+
+        // Загрузка кода
+        const loadBtn = document.getElementById('load-btn');
+        const fileInput = document.getElementById('file-input');
+
+        loadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file && file.name.endsWith('.py')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    editor.setValue(e.target.result);
+                };
+                reader.readAsText(file);
+            } else {
+                alert("Пожалуйста, выберите файл с расширением .py");
+            }
+        });
+
+        // Инициализация Bootstrap Tooltip (для кнопки Поделиться)
+        document.addEventListener('DOMContentLoaded', () => {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+        });
+    </script>
+</body>
+</html>
